@@ -1,0 +1,18 @@
+---
+title: "Homework 5"
+author: "Ashley Nguyen"
+format: html
+editor: visual
+embed-resources: true
+---
+
+```{r}
+#| warning: false
+library(tidyverse)
+```
+
+```{r}
+#directory <- "C:\\Users\\cpgl0052\\Dropbox\\Research\\delong maze\\"
+d <- read.csv(here("data/belong maze 40Ss.cs"))
+
+```
