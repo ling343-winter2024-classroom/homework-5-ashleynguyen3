@@ -11,8 +11,144 @@ embed-resources: true
 library(tidyverse)
 ```
 
+## Importing Data
+
 ```{r}
 #directory <- "C:\\Users\\cpgl0052\\Dropbox\\Research\\delong maze\\"
-d <- read.csv(here("data/belong maze 40Ss.cs"))
+here::i_am("analysis/Homework5.qmd")
+library(here)
+d <- read.csv(here("data/delong maze 40Ss.csv"), 
+              header = 0, sep = ",", comment.char = "#", strip.white = T,
+              col.names = c("Index","Time","Counter","Hash","Owner","Controller","Item","Element","Type","Group","FieldName","Value","WordNum","Word","Alt","WordOn","CorrWord","RT","Sent","TotalTime","Question","Resp","Acc","RespRT"));
 
+
+```
+
+```{r}
+rt <- d[d$Controller == "Maze" & substr(d$Type,1,4) != "prac", c(1:10,13:20)]
+rt <- separate(data = rt, col = Type, into = c("exp", "item", "expect", "position", "pos", "cloze", "art.cloze", "n.cloze"), sep = "\\.", convert = TRUE, fill = "right")
+rt <- as.data.frame(lapply(rt, function (x) if (is.factor(x) | is.character(x)) factor(x) else x))
+rt$WordNum <- as.numeric(as.character(rt$WordNum))
+rt$RT <- as.numeric(as.character(rt$RT))
+rt$TotalTime <- as.numeric(as.character(rt$TotalTime))
+rt$Acc <- as.numeric(as.character(recode(rt$CorrWord, yes = "1", no = "0")))
+rt$n.cloze.scale <- scale(rt$n.cloze)
+rt$art.cloze.scale <- scale(rt$art.cloze)
+```
+
+```{r}
+rt <- rt[rt$item != 29,]
+```
+
+## Introduction 
+
+This study is about the theory that people who comprehend, predicts upcoming linguistic content. In past studies researchers had taken advantage of different factors that may lead to response bias and inaccurate findings. With the OSF studies they use a maze task that is sensitive to expectation and a more useful way to predict comprehension. Some example sentences from the stimuli are "The old wives' tale says that if you want to keep the doctor away then you should eat an apple a day." and "The old wives' tale says that if you want to keep the doctor away then you should eat a carrot a day."
+
+## Data Dictionary 
+
+Time: Date and time of when data was collected by participant
+
+Counter
+
+Hash: Participant ID
+
+Logged in as experiment owner?: A screening question whether or not participant logged in as an experiemwnt owner.
+
+Controller name: Name of the controller
+
+Item number: Number of item
+
+Element number: number of elemnt
+
+Type
+
+Group
+
+Field name: Name of field
+
+Field value: Value of field
+
+Word number: Number of word
+
+Word
+
+Alternative
+
+Word on (0 = left, 1 = right)
+
+Correct: Yes or no
+
+Reading time to first answer: Time it takes to
+
+Sentence: sentenced used to stimuli
+
+Total time to correct answer: Time to correct answer
+
+Question (NULL if none)
+
+Answer
+
+Whether or not answer was correct: The answer either incorrect or correct
+
+Time taken to answer: The time it took to answer
+
+## Participants 
+
+```{r}
+rt |> group_by(Hash)
+```
+
+There are 39 participants in this study.
+
+## Excluded 
+
+After removing the trials as described in the "data analysis" section, I was left with 69303 rows I removed item 29 as it was non-applicable to the data frame (due to incorrect noun pairing), as well as screening out the CorrWord row by removing all the answers that had no in it.
+
+## Table 
+
+Let's see the mean, min, max, and standard deviation of participant ages using a table.
+
+```{r}
+table <- d %>% filter(FieldName == "age") %>% summarize(m.age = mean(as.numeric(as.character(Value))), 
+                                              min.age = min(as.numeric(as.character(Value))), 
+                                              max.age = max(as.numeric(as.character(Value))),
+                                              sd.age = sd(as.numeric(as.character(Value))))
+
+
+```
+
+table: `r table`
+
+## Figure 1
+
+Finally, we shall reproduce figure 1 using our rt data set, seeing the differences in words and reading time for expected and unexpected.
+
+```{r}
+rt.s <- rt[rt$Hash != '9dAvrH0+R6a0U5adPzZSyA',]
+
+rt.s$rgn.fix <- rt.s$WordNum - rt.s$pos + 1
+rt.s$word.num.z <- scale(rt.s$WordNum)
+rt.s$word.len <- nchar(as.character(rt.s$Word))
+rt.s$Altword.len <- nchar(as.character(rt.s$Alt))
+contrasts(rt.s$expect) <- c(-.5,.5)
+
+rt.s$item.expect <- paste(rt.s$item, rt.s$expect, sep=".")
+delong.items <- rt.s %>% filter(rgn.fix == 0) %>% distinct(item.expect, .keep_all = TRUE)
+
+
+rt.s.filt <- rt.s[rt.s$Hash != "gyxidIf0fqXBM7nxg2K7SQ" & rt.s$Hash != "f8dC3CkleTBP9lUufzUOyQ",]
+
+```
+
+```{r}
+rgn.rt.raw <- rt.s.filt %>% filter(rgn.fix > -4 & rgn.fix < 5) %>% filter(Acc == 1) %>% group_by(rgn.fix, expect) %>% summarize(n=n(), subj=length(unique(Hash)), rt=mean(RT), sd=sd(RT), stderr=sd/sqrt(subj)) %>% as.data.frame()
+rgn.rt.raw$rgn <- as.factor(recode(rgn.rt.raw$rgn.fix, "-3"="CW-3", "-2"="CW-2", "-1"="CW-1", "0"="art", "1"="n","2"="CW+1", "3"="CW+2", "4"="CW+3"))
+rgn.rt.raw$rgn <- ordered(rgn.rt.raw$rgn, levels = c("CW-3", "CW-2", "CW-1", "art", "n", "CW+1", "CW+2", "CW+3"))
+ggplot(rgn.rt.raw, aes(x=rgn, y=rt, group=expect, shape=expect)) +
+  geom_line(stat = "identity", position=position_dodge(width=.3)) +
+  geom_point(stat = "identity", position=position_dodge(width=.3), size=3) +
+  geom_errorbar(aes(ymin = rt-stderr, ymax = rt+stderr), width=.15, position=position_dodge(width=.3)) +
+  scale_shape_manual(name="", labels=c("Expected", "Unexpected"), values = c(21,19)) + 
+  xlab("Word") + ylab("Reading Time (msec)") + 
+  theme_bw()
 ```
